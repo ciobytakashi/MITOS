@@ -1,0 +1,59 @@
+
+name: MITOS Android APK Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Locate and extract MITOS project
+        run: |
+          ZIP_FILE="$(find . -maxdepth 1 -type f -iname '*.zip' -print -quit)"
+          if [ -z "$ZIP_FILE" ]; then
+            echo "MITOS project ZIP not found"
+            exit 1
+          fi
+          mkdir -p mitos-source
+          unzip -q "$ZIP_FILE" -d mitos-source
+          test -f mitos-source/settings.gradle.kts
+          test -f mitos-source/app/build.gradle.kts
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build MITOS debug APK
+        run: |
+          gradle --no-daemon -p mitos-source :app:assembleDebug
+
+      - name: Rename APK
+        run: |
+          mkdir -p output
+          cp mitos-source/app/build/outputs/apk/debug/app-debug.apk output/MITOS-debug.apk
+
+      - name: Upload MITOS APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MITOS-debug-apk
+          path: output/MITOS-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+          
